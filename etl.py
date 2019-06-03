@@ -67,6 +67,7 @@ def process_data(spark, input_data, output_data):
                                  "logs.userId AS user_agent", \
                                  "year(CAST(start_time AS date)) AS year", \
                                  "month(CAST(start_time AS date)) AS month")   # year & month column used for partitioning
+    df_songplays.drop_duplicates()
     
     # DIM TABLE 1: dim_songs
     df_songs = df_input_song.selectExpr("song_id",\
@@ -74,6 +75,7 @@ def process_data(spark, input_data, output_data):
                                         "artist_id", \
                                         "year", \
                                         "duration")
+    df_songs.drop_duplicates(subset=['song_id'])
 
     # DIM TABLE 2: dim_artists
     df_artists = df_input_song.filter("artist_id is not null and artist_id != ''") \
@@ -82,6 +84,7 @@ def process_data(spark, input_data, output_data):
                                            "artist_location AS location",\
                                            "artist_latitude AS latitude",\
                                            "artist_longitude AS longitude")
+    df_artists.drop_duplicates(subset=['artist_id'])
     
     # DIM TABLE 3: dim_users
     df_users = df_input_logs.filter("userId is not null and userId != ''") \
@@ -90,6 +93,7 @@ def process_data(spark, input_data, output_data):
                                         "lastName AS last_name", \
                                         "gender", \
                                         "level")
+    df_users = df_users.drop_duplicates(subset=['user_id'])
     
      # DIM TABLE 4: dim_time
     df_time = df_songplays.withColumn("hour" , hour(df_songplays.start_time)) \
@@ -99,6 +103,7 @@ def process_data(spark, input_data, output_data):
                            .withColumn("year", year(df_songplays.start_time)) \
                            .withColumn("weekday", date_format(df_songplays.start_time, 'EEEE')) \
                            .select('start_time', 'hour', 'week', 'month', 'year', 'weekday')
+    df_time = df_time.drop_duplicates()
     
     # write: as Parquet files
     #df_users.write.parquet("output/dim_users.parquet")
@@ -106,11 +111,12 @@ def process_data(spark, input_data, output_data):
     #df_songs.write.partitionBy('year','artist_id').parquet("output/dim_songs.parquet")
     #df_time.write.partitionBy('year','month').parquet("output/dim_time.parquet")
     #df_songplays.write.partitionBy('year','month').parquet("output/fact_songplays.parquet")   
-    df_songplays.write.partitionBy('year','month').parquet(output_data + "fact_songplays.parquet")
-    df_users.write.parquet(output_data + "dim_users.parquet")
-    df_artists.write.parquet(output_data + "dim_artists.parquet")
-    df_songs.write.partitionBy('year','artist_id').parquet(output_data + "dim_songs.parquet")
-    df_time.write.partitionBy('year','month').parquet(output_data + "dim_time.parquet")    
+    df_songplays.write.mode('overwrite').partitionBy('year','month').parquet(output_data + "fact_songplays.parquet")
+    df_users.write.mode('overwrite').parquet(output_data + "dim_users.parquet")
+    df_artists.write.mode('overwrite').parquet(output_data + "dim_artists.parquet")
+    df_songs.write.mode('overwrite').partitionBy('year','artist_id').parquet(output_data + "dim_songs.parquet")
+    df_time.write.mode('overwrite').partitionBy('year','month').parquet(output_data + "dim_time.parquet")
+   
     
 def main():
     spark = create_spark_session()
